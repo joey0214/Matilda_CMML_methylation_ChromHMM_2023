@@ -1,0 +1,20 @@
+State (User order)	Genome %	/Users/xiangfu.zhong/Library/CloudStorage/OneDrive-KarolinskaInstitutet/Matilda_CMML_methylation_ChromHMM_2023/methyChromHMM/sigHyperDMPs.bed
+1_TssA	0,32746	1,41697
+2_TssFlnk	0,09241	3,41414
+3_TssFlnkU	1,14431	12,54144
+4_TssFlnkD	0,39866	9,07247
+5_Tx	6,46604	0,94111
+6_TxWk	7,44423	1,23287
+7_EnhG1	0,75002	3,83249
+8_EnhG2	0,20190	9,05485
+9_EnhA1	0,88540	9,26257
+10_EnhA2	0,48564	3,92680
+11_EnhWk	1,63864	6,40078
+12_ZNF/Rpts	1,31537	0,18167
+13_Het	7,27264	0,08007
+14_TssBiv	0,25032	1,64042
+15_EnhBiv	0,16751	5,66447
+16_ReprPC	2,69474	1,60132
+17_ReprPCWk	7,67967	1,00234
+18_Quies	60,78502	0,43590
+Base	100	0,00142
