@@ -137,46 +137,6 @@ ENCFF072SCA.bed %>% as.data.frame() %>%  dplyr::select(seqnames, name) %>% table
 | 18  |  Quies | Quiescent/Low  |   |
 
 [Summarized visualization of chromatin states](https://egg2.wustl.edu/roadmap/data/byFileType/chromhmmSegmentations/ChmmModels/core_K27ac/jointModel/final/annotationEnrichment_RoadmapEp_core_K27ac_18State.png)
-	
-
-### run chromHMM
-
-```{bash, eval=FALSE}
-cd /Users/xiangfu.zhong/Library/CloudStorage/OneDrive-KarolinskaInstitutet/Matilda_CMML_methylation_ChromHMM_2023/methyChromHMM
-
-### all significant DMPs
-java -jar /Users/xiangfu.zhong/Documents/RESEARCH.KI/chromatinState/ChromHMM/ChromHMM.jar  OverlapEnrichment -labels /Users/xiangfu.zhong/Library/CloudStorage/OneDrive-KarolinskaInstitutet/Matilda_CMML_methylation_ChromHMM_2023/RoadMap/ENCFF072SCA.bed /Users/xiangfu.zhong/Library/CloudStorage/OneDrive-KarolinskaInstitutet/Matilda_CMML_methylation_ChromHMM_2023/methyChromHMM/sigDMPs.bed  /Users/xiangfu.zhong/Library/CloudStorage/OneDrive-KarolinskaInstitutet/Matilda_CMML_methylation_ChromHMM_2023/methyChromHMM/sigDMPs_within_chromatinStates
-
-### hypermethylated DMPs
-java -jar /Users/xiangfu.zhong/Documents/RESEARCH.KI/chromatinState/ChromHMM/ChromHMM.jar  OverlapEnrichment -labels /Users/xiangfu.zhong/Library/CloudStorage/OneDrive-KarolinskaInstitutet/Matilda_CMML_methylation_ChromHMM_2023/RoadMap/ENCFF072SCA.bed /Users/xiangfu.zhong/Library/CloudStorage/OneDrive-KarolinskaInstitutet/Matilda_CMML_methylation_ChromHMM_2023/methyChromHMM/sigHyperDMPs.bed  /Users/xiangfu.zhong/Library/CloudStorage/OneDrive-KarolinskaInstitutet/Matilda_CMML_methylation_ChromHMM_2023/methyChromHMM/sigHyperDMPs_within_chromatinStates
-
-### hypomethylated DMPs
-java -jar /Users/xiangfu.zhong/Documents/RESEARCH.KI/chromatinState/ChromHMM/ChromHMM.jar  OverlapEnrichment -labels /Users/xiangfu.zhong/Library/CloudStorage/OneDrive-KarolinskaInstitutet/Matilda_CMML_methylation_ChromHMM_2023/RoadMap/ENCFF072SCA.bed /Users/xiangfu.zhong/Library/CloudStorage/OneDrive-KarolinskaInstitutet/Matilda_CMML_methylation_ChromHMM_2023/methyChromHMM/sigHypoDMPs.bed  /Users/xiangfu.zhong/Library/CloudStorage/OneDrive-KarolinskaInstitutet/Matilda_CMML_methylation_ChromHMM_2023/methyChromHMM/sigHypoDMPs_within_chromatinStates
-```
-
-### visualization
-
-```{r message=FALSE, warning=FALSE}
-sigDMPs.chromhmm <- readr::read_tsv( paste0( CMML_dataPath, "methyChromHMM/sigDMPs_within_chromatinStates.txt"), locale=locale(decimal_mark = ","))
-colnames(sigDMPs.chromhmm) <- c("states", "Genome", "sigDMPs")
-
-sigHyperDMPs.chromhmm <- readr::read_tsv( paste0( CMML_dataPath, "methyChromHMM/sigHyperDMPs_within_chromatinStates.txt"), locale=locale(decimal_mark = ","))
-colnames(sigHyperDMPs.chromhmm) <- c("states"
-                                     , "Genome", "sigHyperDMPs")
-
-sigHypoDMPs.chromhmm <- readr::read_tsv( paste0( CMML_dataPath, "methyChromHMM/sigHypoDMPs_within_chromatinStates.txt"), locale=locale(decimal_mark = ","))
-colnames(sigHypoDMPs.chromhmm) <- c("states", "Genome", "sigHypoDMPs")
-
-
-pooledChromhmm  <- merge(sigDMPs.chromhmm[, c("states", "sigDMPs")], sigHyperDMPs.chromhmm[, c("states", "sigHyperDMPs")], by="states")
-pooledChromhmm <- merge(pooledChromhmm, sigHypoDMPs.chromhmm[, c("states", "sigHypoDMPs")], by="states")
-rownames(pooledChromhmm) <- pooledChromhmm$states
-pooledChromhmm <- pooledChromhmm[,-1]
-
-ComplexHeatmap::Heatmap(scale(pooledChromhmm), heatmap_legend_param = list(title = "Enrichment", title_position = "leftcenter-rot"), cluster_rows = FALSE, cluster_columns = FALSE,  col=circlize::colorRamp2(c(0,  1), c("white", "firebrick")), show_column_dend = FALSE, show_row_names = TRUE, row_names_side = "right", row_title = " ") 
-
-```
-
 
 ### site proportion
 
@@ -620,7 +580,7 @@ colnames(CMML_metadata) <- CMML_metadata["id",]
 
 CML_mutation <- (CMML_metadata[c("TET2", "ASXL1", "SRSF2", "U2AF1", "PRPF8", "SF3B1", "ZRSR2"),])
 
-ComplexHeatmap::Heatmap(type_convert(CML_mutation), name="mutation", show_column_names = FALSE, col=structure(1:2, names = c("0", "1")), cluster_columns = TRUE, column_split  = as.vector(unlist(CMML_metadata["cluster_WXS",])),  top_annotation = HeatmapAnnotation(cohort=as.vector(unlist(CMML_metadata["cohort",])), sex = as.vector(unlist(CMML_metadata["sex",])), WHO.class = as.vector(unlist(CMML_metadata["WHO.class",])), WXS = as.vector(unlist(CMML_metadata["cluster_WXS",])), FAB.group = as.vector(unlist(CMML_metadata["FAB.group",])), WBC = as.numeric(unlist(CMML_metadata["WBC",])), cluster_DNAmethyl = as.vector(unlist(CMML_metadata["cluster_DNAmethyl",])), TET2_multihit = as.vector(unlist(CMML_metadata["TET2_multihit",])), TET2_multihit_CNVadj = as.vector(unlist(CMML_metadata["TET2_multihit_CNVadj",])), del4q=  as.vector(unlist(CMML_metadata["del4q",])), TET2_SRSF2 = as.vector(unlist(CMML_metadata["TET2_SRSF2",])), show_legend = FALSE ) )
+ComplexHeatmap::Heatmap(type_convert(CML_mutation), name="mutation", show_column_names = FALSE, col=structure(1:2, names = c("0", "1")), cluster_columns = TRUE, column_split  = as.vector(unlist(CMML_metadata["cluster_WXS",])),  top_annotation = ComplexHeatmap::HeatmapAnnotation(cohort=as.vector(unlist(CMML_metadata["cohort",])), sex = as.vector(unlist(CMML_metadata["sex",])), WHO.class = as.vector(unlist(CMML_metadata["WHO.class",])), WXS = as.vector(unlist(CMML_metadata["cluster_WXS",])), FAB.group = as.vector(unlist(CMML_metadata["FAB.group",])), WBC = as.numeric(unlist(CMML_metadata["WBC",])), cluster_DNAmethyl = as.vector(unlist(CMML_metadata["cluster_DNAmethyl",])), TET2_multihit = as.vector(unlist(CMML_metadata["TET2_multihit",])), TET2_multihit_CNVadj = as.vector(unlist(CMML_metadata["TET2_multihit_CNVadj",])), del4q=  as.vector(unlist(CMML_metadata["del4q",])), TET2_SRSF2 = as.vector(unlist(CMML_metadata["TET2_SRSF2",])), show_legend = FALSE ) )
 
 ```
 
