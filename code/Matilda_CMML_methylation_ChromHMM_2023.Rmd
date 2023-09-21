@@ -26,8 +26,10 @@ meta_data <- readr::read_delim(paste0(CMML_dataPath, "Matilda_data/Meta_Data_202
 
 <h style="color:red">**UPDATE NOTE**</h>
 
-- <h style="color:red">added additional dataset for DMPs with LFC>0.3 according to the diaacusion on Tuesday 09.19</h>
+- <h style="color:red">added additional dataset for DMPs with LFC>0.3  and LFC>0.2 according to the discussion on Tuesday 09.19</h>
 - <h style="color:red">updated the enhancer gene association table, easy to use</h>
+
+
 
 ## filtering DMPs
 
@@ -58,6 +60,27 @@ DMP_data.sig %>% ggplot(aes(x=logFC, y=-log(adj.P.Val))) +geom_point()
 # table(DMP_data.sig$CHR)
 ```
 
+some numbers to help decide what logFC as cutoff
+
+|logFC | DMP count | 
+|:------:|:---------:|
+|0.1 | 43104|
+|0.15 | 22770|
+|0.2 | 10960|
+|0.25 | 4902|
+|0.3 | 1943|
+
+The table is based on filtering with (1) `adj.P.Val < 0.01` and (2) `!(mC_1_AVG < 0.1 & mC_2_AVG < 0.1)`, and then (3) `logFC`
+
+```{r}
+DMP_data %>% dplyr::mutate(sig=ifelse(.$adj.P.Val < 0.01, "sig","noSig")) %>% ggplot2::ggplot(aes(x=mC_1_AVG, y=mC_2_AVG, color=sig)) +geom_point(alpha=0.6,size=1)  # +geom_density2d()#
+
+DMP_data %>% dplyr::filter(adj.P.Val < 0.01 )  %>% ggplot2::ggplot(aes(x=logFC)) +geom_density() +scale_x_continuous(breaks=seq(-0.4, 1, 0.1))
+
+DMP_data %>% dplyr::filter(adj.P.Val < 0.01 ) %>% dplyr::filter(!(mC_1_AVG < 0.1 & mC_2_AVG < 0.1) )  %>% dplyr::filter(logFC >= 0.2 )  %>% nrow()
+
+```
+
 export significant sites to bed files
 
 ```{r}
@@ -86,11 +109,14 @@ length(ENCFF072SCA.bed)
 ENCFF072SCA.bed <-  ENCFF072SCA.bed[seqnames(ENCFF072SCA.bed) %in% paste0("chr", unique(DMP_data$CHR))]
 length(ENCFF072SCA.bed)
 
-ENCFF072SCA.bed[!seqnames(ENCFF072SCA.bed) %in% paste0("chr", unique(DMP_data$CHR))] %>% as.data.frame() %>%  dplyr::select(name) %>% table()
+stateFactor <- lapply(unique(ENCFF072SCA.bed$name), function(x) str_split(x, "_")[[1]][1]) %>% unlist()  %>% as.numeric()
+names(stateFactor) <- unique(ENCFF072SCA.bed$name)
+
+ENCFF072SCA.bed %>% as.data.frame() %>%  dplyr::select(seqnames, name) %>% table() %>% as.data.frame() %>% dplyr::filter(!seqnames %in% c("chrX", "chrM")) %>% ggplot2::ggplot(aes(x=seqnames, y= name, fill=scale(Freq))) +geom_tile() + scale_fill_gradient(low = "white", high = "red") +theme(axis.text.x = element_text(angle = 45, hjust=1)) +xlab("") +ylab("") 
 ```
 
 | STATE NO.  | MNEMONIC  |  DESCRIPTION |   |
-|---|---|---|---|
+|:---:|:---|:---:|:---:|
 | 1  | TssA  |  Active TSS |   |
 | 2  | TssFlnk  | Flanking TSS  |   |
 | 3  | TssFlnkU  | Flanking TSS Upstream  |   |
@@ -157,8 +183,6 @@ ComplexHeatmap::Heatmap(scale(pooledChromhmm), heatmap_legend_param = list(title
 [Tulstrup *et al.* 2021, Nature Communications](https://doi.org/10.1038/s41467-021-26093-2) they actually used site proportion, not a function from ChromHMM.
 
 ```{r}
-stateFactor <- lapply(unique(ENCFF072SCA.bed$name), function(x) str_split(x, "_")[[1]][1]) %>% unlist()  %>% as.numeric()
-names(stateFactor) <- unique(ENCFF072SCA.bed$name)
 
 #### function to get proportion of sites within chromatin states ####
 getOverlapproportion <- function(queryDMPtab, setLabel, totalDMPtab, chrStateBed){
@@ -277,8 +301,6 @@ txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
 
 DMP_data.sig %>% dplyr::filter(logFC >= 0.3)   %>% nrow()
 
-HyperMethyled_LFC3.bed
-
 HyperMethyled_LFC3.bed <- DMP_data.sig %>% dplyr::filter(logFC >= 0.3)  %>% dplyr::mutate(CHR=paste0("chr", CHR))  %>% dplyr::mutate(start=MAPINFO) %>% dplyr::mutate(end=MAPINFO+1) %>% dplyr::select(CHR, start, end)  %>% GenomicRanges::GRanges()
 
 enhancer_buff_LFC3 <- data.frame()
@@ -294,7 +316,37 @@ for(iEnhType in c("7_EnhG1", "8_EnhG2", "9_EnhA1", "10_EnhA2", "11_EnhWk" )){
   enhancer_buff_LFC3 <- rbind(data.frame(iTargetEnhancer.peakAnno, enhancerGroup=iEnhType), enhancer_buff_LFC3)
 }
 
-readr::write_tsv(enhancer_buff_LFC3, file=paste0(CMML_dataPath, "resultTables_CMML_to_Matild/multiple_HyperMethyled_in_enhancers_LFC3.tsv"), progress = FALSE)
+# readr::write_tsv(enhancer_buff_LFC3, file=paste0(CMML_dataPath, "resultTables_CMML_to_Matild/multiple_HyperMethyled_in_enhancers_LFC3.tsv"), progress = FALSE)
+```
+
+#### <h style="color:red"> enhancers have multiple hyper methyled  (LFC2) </h>
+
+multiple HyperMethyled DMPs (**adj.P.Val < 0.01 & abs(logFC) >= 0.2**) in enhancers 
+
+OUTPUT FILE: `multiple_HyperMethyled_in_enhancers_LFC2.tsv`
+
+```{r message=FALSE, warning=FALSE}
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+
+DMP_data.sig %>% dplyr::filter(logFC >= 0.2)   %>% nrow()
+
+HyperMethyled_LFC2.bed <- DMP_data.sig %>% dplyr::filter(logFC >= 0.2)  %>% dplyr::mutate(CHR=paste0("chr", CHR))  %>% dplyr::mutate(start=MAPINFO) %>% dplyr::mutate(end=MAPINFO+1) %>% dplyr::select(CHR, start, end)  %>% GenomicRanges::GRanges()
+
+enhancer_buff_LFC2 <- data.frame()
+
+for(iEnhType in c("7_EnhG1", "8_EnhG2", "9_EnhA1", "10_EnhA2", "11_EnhWk" )){
+  iEnhType_enhancerBed <- enhancerBed[enhancerBed$name == iEnhType,]
+  i_hyperDMP_in_enhancer <- GenomicRanges::findOverlaps(HyperMethyled_LFC2.bed, iEnhType_enhancerBed)
+  i_summaryTab <- subjectHits(i_hyperDMP_in_enhancer) %>% table() %>% as.data.frame() %>% dplyr::filter(Freq >1) %>% dplyr::rename(subjectHits='.')
+  iTargetEnhancer <- iEnhType_enhancerBed[as.numeric(unfactor(i_summaryTab$subjectHits))]
+  values(iTargetEnhancer) <- data.frame(siteCount = i_summaryTab$Freq)
+  iTargetEnhancer.peakAnno <- ChIPseeker::annotatePeak(iTargetEnhancer, tssRegion=c(-3000, 3000),  TxDb=txdb, annoDb="org.Hs.eg.db", verbose =FALSE) %>% as.data.frame() 
+  
+  enhancer_buff_LFC2 <- rbind(data.frame(iTargetEnhancer.peakAnno, enhancerGroup=iEnhType), enhancer_buff_LFC2)
+}
+
+# readr::write_tsv(enhancer_buff_LFC2, file=paste0(CMML_dataPath, "resultTables_CMML_to_Matild/multiple_HyperMethyled_in_enhancers_LFC2.tsv"), progress = FALSE)
 ```
 
 
@@ -452,23 +504,27 @@ geneHancer.gff$enhancerid <- unlist(lapply(geneHancer.gff$attributes, function(x
 ```
 
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 #### DMR set overlapping with enhancer states and have multiple DMP 
 DMR_set01 <- DMR_data.bed[queryHits(GenomicRanges::findOverlaps(DMR_data.bed, multiple_HyperMethyled_in_enhancers.bed))] %>% unique()
 
 DMR_enhancer.set01 <- cbind(as.data.frame(DMR_set01[queryHits(GenomicRanges::findOverlaps(DMR_set01, geneHancer))]), as.data.frame(geneHancer[subjectHits(GenomicRanges::findOverlaps(DMR_set01, geneHancer))])["name"]) %>% dplyr::rename(enhancerid=name) %>% merge(geneHancer.gff[c("enhancerid", "attributes")], by="enhancerid")
 
-DMR_enhancer.set01$attributes <- gsub("genehancer_id=|connected_gene=|score=", "", DMR_enhancer.set01$attributes)
+DMR_enhancer.set01$attributes <- gsub("genehancer_id=|connected_gene=", "", DMR_enhancer.set01$attributes)
+
+DMR_enhancer.set01$attributes <- gsub(";score=", ":", DMR_enhancer.set01$attributes)
 
 DMR_enhancer.set01
 nrow(DMR_enhancer.set01)
+
 #### all DMR
 DMR_enhancer.set02 <- cbind(as.data.frame(DMR_data.bed[queryHits(GenomicRanges::findOverlaps(DMR_data.bed, geneHancer))]), as.data.frame(geneHancer[subjectHits(GenomicRanges::findOverlaps(DMR_data.bed, geneHancer))])["name"])  %>% dplyr::rename(enhancerid=name) %>% merge(geneHancer.gff[c("enhancerid", "attributes")], by="enhancerid")
 
-DMR_enhancer.set02$attributes <- gsub("genehancer_id=|connected_gene=|score=", "", DMR_enhancer.set02$attributes)
+DMR_enhancer.set02$attributes <- gsub("genehancer_id=|connected_gene=", "", DMR_enhancer.set02$attributes)
+DMR_enhancer.set02$attributes <- gsub(";score=", ":", DMR_enhancer.set02$attributes)
 
 head(DMR_enhancer.set02)
-readr::write_tsv(DMR_enhancer.set02, file=paste0(CMML_dataPath, "resultTables_CMML_to_Matild/DMR_gene_associations.tsv"), progress = FALSE)
+# readr::write_tsv(DMR_enhancer.set02, file=paste0(CMML_dataPath, "resultTables_CMML_to_Matild/DMR_gene_associations.tsv"), progress = FALSE)
 
 # DMR_data.bed[queryHits(GenomicRanges::findOverlaps(DMR_data.bed, geneHancer))]
 # geneHancer[subjectHits(GenomicRanges::findOverlaps(DMR_data.bed, geneHancer))]
@@ -477,32 +533,46 @@ readr::write_tsv(DMR_enhancer.set02, file=paste0(CMML_dataPath, "resultTables_CM
 ```
 
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 HyperMethyled_in_enhancers.bed <- readr::read_tsv(paste0(CMML_dataPath, "resultTables_CMML_to_Matild/HyperMethyled_in_enhancers.tsv"), progress = FALSE) %>% GenomicRanges::GRanges()
 
 HyperMethyled_in_enhancers <- cbind(as.data.frame(HyperMethyled_in_enhancers.bed[queryHits(GenomicRanges::findOverlaps(HyperMethyled_in_enhancers.bed, geneHancer))]), as.data.frame(geneHancer[subjectHits(GenomicRanges::findOverlaps(HyperMethyled_in_enhancers.bed, geneHancer))])["name"]) %>% dplyr::rename(enhancerid=name) %>% merge(geneHancer.gff[c("enhancerid", "attributes")], by="enhancerid")
 
-HyperMethyled_in_enhancers$attributes <- gsub("genehancer_id=|connected_gene=|score=", "", HyperMethyled_in_enhancers$attributes)
+HyperMethyled_in_enhancers$attributes <- gsub("genehancer_id=|connected_gene=", "", HyperMethyled_in_enhancers$attributes)
+
+HyperMethyled_in_enhancers$attributes <- gsub(";score=", ":", HyperMethyled_in_enhancers$attributes)
 
 head(HyperMethyled_in_enhancers)
 
-readr::write_tsv(HyperMethyled_in_enhancers, file=paste0(CMML_dataPath, "resultTables_CMML_to_Matild/HyperMethyled_in_enhancers_gene_associations.tsv"), progress = FALSE)
+# readr::write_tsv(HyperMethyled_in_enhancers, file=paste0(CMML_dataPath, "resultTables_CMML_to_Matild/HyperMethyled_in_enhancers_gene_associations.tsv"), progress = FALSE)
 ```
 
 **LFC>=0.3**
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 LFC3_HyperMethyled_in_enhancers.bed <- readr::read_tsv(paste0(CMML_dataPath, "resultTables_CMML_to_Matild/multiple_HyperMethyled_in_enhancers_LFC3.tsv"), progress = FALSE) %>% GenomicRanges::GRanges()
 
 LFC3_HyperMethyled_in_enhancers <- cbind(as.data.frame(LFC3_HyperMethyled_in_enhancers.bed[queryHits(GenomicRanges::findOverlaps(LFC3_HyperMethyled_in_enhancers.bed, geneHancer))]), as.data.frame(geneHancer[subjectHits(GenomicRanges::findOverlaps(LFC3_HyperMethyled_in_enhancers.bed, geneHancer))])["name"]) %>% dplyr::rename(enhancerid=name) %>% merge(geneHancer.gff[c("enhancerid", "attributes")], by="enhancerid")
 
-LFC3_HyperMethyled_in_enhancers$attributes <- gsub("genehancer_id=|connected_gene=|score=", "", LFC3_HyperMethyled_in_enhancers$attributes)
+LFC3_HyperMethyled_in_enhancers$attributes <- gsub("genehancer_id=|connected_gene=", "", LFC3_HyperMethyled_in_enhancers$attributes)
+LFC3_HyperMethyled_in_enhancers$attributes <- gsub(";score=", ":", LFC3_HyperMethyled_in_enhancers$attributes)
 
-head(LFC3_HyperMethyled_in_enhancers)
-
-readr::write_tsv(LFC3_HyperMethyled_in_enhancers, file=paste0(CMML_dataPath, "resultTables_CMML_to_Matild/HyperMethyled_in_enhancers_gene_associations_LFC3.tsv"), progress = FALSE)
+# readr::write_tsv(LFC3_HyperMethyled_in_enhancers, file=paste0(CMML_dataPath, "resultTables_CMML_to_Matild/HyperMethyled_in_enhancers_gene_associations_LFC3.tsv"), progress = FALSE)
 ```
 
+
+**LFC>=0.2**
+
+```{r message=FALSE, warning=FALSE}
+LFC2_HyperMethyled_in_enhancers.bed <- readr::read_tsv(paste0(CMML_dataPath, "resultTables_CMML_to_Matild/multiple_HyperMethyled_in_enhancers_LFC2.tsv"), progress = FALSE) %>% GenomicRanges::GRanges()
+
+LFC2_HyperMethyled_in_enhancers <- cbind(as.data.frame(LFC2_HyperMethyled_in_enhancers.bed[queryHits(GenomicRanges::findOverlaps(LFC2_HyperMethyled_in_enhancers.bed, geneHancer))]), as.data.frame(geneHancer[subjectHits(GenomicRanges::findOverlaps(LFC2_HyperMethyled_in_enhancers.bed, geneHancer))])["name"]) %>% dplyr::rename(enhancerid=name) %>% merge(geneHancer.gff[c("enhancerid", "attributes")], by="enhancerid")
+
+LFC2_HyperMethyled_in_enhancers$attributes <- gsub("genehancer_id=|connected_gene=", "", LFC2_HyperMethyled_in_enhancers$attributes)
+LFC2_HyperMethyled_in_enhancers$attributes <- gsub(";score=", ":", LFC2_HyperMethyled_in_enhancers$attributes)
+
+# readr::write_tsv(LFC2_HyperMethyled_in_enhancers, file=paste0(CMML_dataPath, "resultTables_CMML_to_Matild/HyperMethyled_in_enhancers_gene_associations_LFC2.tsv"), progress = FALSE)
+```
 
 
 ```{r}
@@ -536,6 +606,22 @@ readr::write_tsv(LFC3_HyperMethyled_in_enhancers, file=paste0(CMML_dataPath, "re
 # p.txdb <- ggbio::autoplot(Homo.sapiens, which = wh)
 # tks <- ggbio::tracks(p.ideo,  dbSNP = p.vr, gene = p.txdb,heights = c( 3, 3,  4)) + ggbio::theme_tracks_sunset()
 # tks
+```
+
+
+## play with metadata
+
+```{r message=FALSE, warning=FALSE}
+CMML_metadata <- readr::read_delim(paste0(CMML_dataPath, "Matilda_data/Meta_Data_20230831.csv"), progress = FALSE, delim = ";", quote = '"') 
+
+CMML_metadata <- as.data.frame(t(CMML_metadata[!is.na(CMML_metadata[,c("TET2")]),]) )# filter out one patient without mutation data available
+
+colnames(CMML_metadata) <- CMML_metadata["id",]
+
+CML_mutation <- (CMML_metadata[c("TET2", "ASXL1", "SRSF2", "U2AF1", "PRPF8", "SF3B1", "ZRSR2"),])
+
+ComplexHeatmap::Heatmap(type_convert(CML_mutation), name="mutation", show_column_names = FALSE, col=structure(1:2, names = c("0", "1")), cluster_columns = TRUE, column_split  = as.vector(unlist(CMML_metadata["cluster_WXS",])),  top_annotation = HeatmapAnnotation(cohort=as.vector(unlist(CMML_metadata["cohort",])), sex = as.vector(unlist(CMML_metadata["sex",])), WHO.class = as.vector(unlist(CMML_metadata["WHO.class",])), WXS = as.vector(unlist(CMML_metadata["cluster_WXS",])), FAB.group = as.vector(unlist(CMML_metadata["FAB.group",])), WBC = as.numeric(unlist(CMML_metadata["WBC",])), cluster_DNAmethyl = as.vector(unlist(CMML_metadata["cluster_DNAmethyl",])), TET2_multihit = as.vector(unlist(CMML_metadata["TET2_multihit",])), TET2_multihit_CNVadj = as.vector(unlist(CMML_metadata["TET2_multihit_CNVadj",])), del4q=  as.vector(unlist(CMML_metadata["del4q",])), TET2_SRSF2 = as.vector(unlist(CMML_metadata["TET2_SRSF2",])), show_legend = FALSE ) )
+
 ```
 
 
